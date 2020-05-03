@@ -6,7 +6,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/pkg/errors"
+
+	"github.com/jahkeup/prometheus-moto-exporter/pkg/gather"
 )
 
 // TODO: read these in! Maybe use viper?
@@ -28,6 +29,8 @@ func App() *cobra.Command {
 		logDebug bool
 		bindAddr string
 		endpoint string
+		username string
+		password string
 	)
 
 	cmd := &cobra.Command{
@@ -41,6 +44,8 @@ func App() *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&bindAddr, "bind", "127.0.0.1:9731", "http server bind address")
 	cmd.PersistentFlags().StringVar(&endpoint, "endpoint", "https://192.168.100.1/HNAP1/", "modem HNAP endpoint")
+	cmd.PersistentFlags().StringVar(&username, "username", "admin", "modem HNAP username")
+	cmd.PersistentFlags().StringVar(&password, "password", "motorola", "modem HNAP password")
 
 	cmd.PersistentFlags().BoolVar(&logDebug, "debug", false, "enable debug logging")
 
@@ -67,7 +72,23 @@ func App() *cobra.Command {
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// TODO: configure and run server
-		return errors.New("unimplemented")
+
+		gatherer, err := gather.New(endpointURL, username, password)
+		if err != nil {
+			return err
+		}
+
+		err = gatherer.Login()
+		if err != nil {
+			return err
+		}
+
+		err = gatherer.DownstreamChannelInfo()
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	return cmd
