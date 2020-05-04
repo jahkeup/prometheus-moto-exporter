@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/jahkeup/prometheus-moto-exporter/pkg/plustable"
 )
 
 const hSOAPAction = "SOAPAction"
@@ -189,7 +191,7 @@ func (g *Gatherer) Login() error {
 	return nil
 }
 
-func (g *Gatherer) DownstreamChannelInfo() error {
+func (g *Gatherer) DownstreamChannelInfo() ([]DownstreamInfo, error) {
 	const actionName = "GetMotoStatusDownstreamChannelInfo"
 	const actionURI = "http://purenetworks.com/HNAP1/" + actionName
 
@@ -202,12 +204,12 @@ func (g *Gatherer) DownstreamChannelInfo() error {
 	req, err := g.request(actionName, actionURI, nil)
 	if err != nil {
 		log.Error("unable to prepare request")
-		return err
+		return nil, err
 	}
 	resp, err := g.client.Do(req)
 	if err != nil {
 		log.WithError(err).Error("unable to complete request")
-		return err
+		return nil, err
 	}
 	unlock()
 
@@ -221,12 +223,23 @@ func (g *Gatherer) DownstreamChannelInfo() error {
 
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	logrus.Debug("%#v", response)
+	logrus.Debugf("%#v", response)
 
-	return nil
+	infoTable := plustable.Parse(response.GetMotoStatusDownstreamChannelInfoResponse.MotoConnDownstreamChannel)
+
+	info := make([]DownstreamInfo, len(infoTable))
+	for i, row := range infoTable {
+		err = info[i].Parse(row)
+		if err != nil {
+			log.WithError(err).WithField("row", row).Error("could not parse data")
+			return nil, err
+		}
+	}
+
+	return info, nil
 }
 
 func (g *Gatherer) request(actionName, actionURI string, data io.Reader) (*http.Request, error) {
