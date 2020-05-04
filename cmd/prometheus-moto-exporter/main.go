@@ -83,14 +83,12 @@ func App() *cobra.Command {
 			return err
 		}
 
-		info, err := gatherer.DownstreamChannelInfo()
+		coll, err := gatherer.Gather()
 		if err != nil {
 			return err
 		}
 
-		for _, d := range info {
-			logrus.Debugf("%#v", d)
-		}
+		logrus.Infof("%#v", coll)
 
 		return nil
 	}

@@ -1,11 +1,14 @@
-package gather
+package hnap
 
 import (
+	"encoding/json"
 	"strings"
 	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/jahkeup/prometheus-moto-exporter/pkg/plustable"
 )
 
 // var DSChannelHtml = "<tr align='center'><td class='moto-param-header-s'>&nbsp;&nbsp;&nbsp;Channel</td>";
@@ -23,7 +26,7 @@ import (
 
 type DownstreamInfo struct {
 	ID int64
-	Status string
+	LockStatus string
 	Modulation string
 	ChannelID int64
 	Frequency float64
@@ -37,7 +40,7 @@ func (info *DownstreamInfo) Parse(row []string) error {
 	const infoRowSize = 10
 	const (
 		idField = iota
-		statusField
+		lockStatusField
 		modulationField
 		channelIDField
 		frequencyField
@@ -62,7 +65,7 @@ func (info *DownstreamInfo) Parse(row []string) error {
 		return errors.Wrap(err, "unable to parse upstream ID")
 	}
 
-	info.Status = row[statusField]
+	info.LockStatus = row[lockStatusField]
 	info.Modulation = row[modulationField]
 
 	logrus.WithField("row", row).WithField("info", info).Debugf("parsing channel ID from: %q", row[2])
@@ -75,6 +78,7 @@ func (info *DownstreamInfo) Parse(row []string) error {
 	if err != nil {
 		return errors.Wrap(err, "parse frequency")
 	}
+	info.Frequency *= 1000 * 1000 // Mhz -> hz
 
 	info.DecibelMillivolts, err = strconv.ParseFloat(getField(dbmvField), 64)
 	if err != nil {
@@ -95,6 +99,35 @@ func (info *DownstreamInfo) Parse(row []string) error {
 	if err != nil {
 		return errors.Wrap(err, "parse uncorrected counter")
 	}
+
+	return nil
+}
+
+type DownstreamChannelResponse struct {
+	Channels []DownstreamInfo
+}
+
+func (r *DownstreamChannelResponse) UnmarshalJSON(data []byte) error {
+	var innerType struct {
+		MotoConnDownstreamChannel string
+	}
+
+	err := json.Unmarshal(data, &innerType)
+	if err != nil {
+		return err
+	}
+
+	tbl := plustable.Parse(innerType.MotoConnDownstreamChannel)
+	info := make([]DownstreamInfo, len(tbl))
+	for i, row := range tbl {
+		err = info[i].Parse(row)
+		if err != nil {
+			logrus.WithError(err).WithField("row", row).Error("could not parse data")
+			return err
+		}
+	}
+
+	r.Channels = info
 
 	return nil
 }

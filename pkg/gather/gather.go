@@ -13,13 +13,12 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/jahkeup/prometheus-moto-exporter/pkg/plustable"
+	"github.com/jahkeup/prometheus-moto-exporter/pkg/hnap"
 )
 
 const hSOAPAction = "SOAPAction"
@@ -42,7 +41,7 @@ func New(endpoint *url.URL, username, password string) (*Gatherer, error) {
 		password: password,
 		endpoint: endpoint,
 
-		mu:       &sync.RWMutex{},
+		mu: &sync.RWMutex{},
 
 		client: &http.Client{
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -164,7 +163,6 @@ func (g *Gatherer) Login() error {
 		logrus.WithError(err).Error("unable to complete accepted challenge")
 		return err
 	}
-	io.Copy(os.Stderr, resp.Body)
 	resp.Body.Close()
 
 	logrus.WithFields(logrus.Fields{
@@ -191,17 +189,32 @@ func (g *Gatherer) Login() error {
 	return nil
 }
 
-func (g *Gatherer) DownstreamChannelInfo() ([]DownstreamInfo, error) {
-	const actionName = "GetMotoStatusDownstreamChannelInfo"
+func (g *Gatherer) Gather() (*Collection, error) {
+	const actionName = hnap.GetMultipleHNAPs
 	const actionURI = "http://purenetworks.com/HNAP1/" + actionName
 
 	log := logrus.WithField("action", actionURI)
+
+	data, err := json.Marshal(hnap.GetMultipleRequestData(
+		hnap.GetHomeAddress,
+		hnap.GetHomeConnection,
+		hnap.GetMotoLagStatus,
+		hnap.GetMotoStatusConnectionInfo,
+		hnap.GetMotoStatusDownstreamChannelInfo,
+		hnap.GetMotoStatusLog,
+		hnap.GetMotoStatusSoftware,
+		hnap.GetMotoStatusStartupSequence,
+		hnap.GetMotoStatusUpstreamChannelInfo,
+	))
+	if err != nil {
+		return nil, err
+	}
 
 	g.mu.RLock()
 	unlock := unlockGuarded(g.mu.RLocker())
 	defer unlock()
 
-	req, err := g.request(actionName, actionURI, nil)
+	req, err := g.request(actionName, actionURI, bytes.NewReader(data))
 	if err != nil {
 		log.Error("unable to prepare request")
 		return nil, err
@@ -215,31 +228,35 @@ func (g *Gatherer) DownstreamChannelInfo() ([]DownstreamInfo, error) {
 
 	defer resp.Body.Close()
 
-	var response struct {
-		GetMotoStatusDownstreamChannelInfoResponse struct {
-			MotoConnDownstreamChannel string
-		}
-	}
+	var response hnap.GetMultipleHNAPsResponse
 
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		return nil, err
 	}
 
-	logrus.Debugf("%#v", response)
-
-	infoTable := plustable.Parse(response.GetMotoStatusDownstreamChannelInfoResponse.MotoConnDownstreamChannel)
-
-	info := make([]DownstreamInfo, len(infoTable))
-	for i, row := range infoTable {
-		err = info[i].Parse(row)
-		if err != nil {
-			log.WithError(err).WithField("row", row).Error("could not parse data")
-			return nil, err
-		}
+	for k, v := range response.HNAP {
+		logrus.WithField("name", k).Debugf("%s", v)
 	}
 
-	return info, nil
+	data, err = response.GetJSON(hnap.GetMotoStatusDownstreamChannelInfo)
+	var downstream hnap.DownstreamChannelResponse
+	err = json.Unmarshal(data, &downstream)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err = response.GetJSON(hnap.GetMotoStatusUpstreamChannelInfo)
+	var upstream hnap.UpstreamChannelResponse
+	err = json.Unmarshal(data, &upstream)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Collection{
+		Upstream: upstream.Channels,
+		Downstream: downstream.Channels,
+	}, nil
 }
 
 func (g *Gatherer) request(actionName, actionURI string, data io.Reader) (*http.Request, error) {
@@ -266,6 +283,7 @@ func (g *Gatherer) requestWithKey(actionName, actionURI string, data io.Reader, 
 	return req, nil
 }
 
+// Single use Unlock()er.
 func unlockGuarded(lock sync.Locker) func() {
 	var singleUse sync.Once
 	return func() { singleUse.Do(lock.Unlock) }
@@ -290,8 +308,4 @@ func digest(msg string, key []byte) ([]byte, error) {
 	digestHex := make([]byte, hex.EncodedLen(len(digestData)))
 	hex.Encode(digestHex, digestData)
 	return bytes.ToUpper(digestHex), nil
-}
-
-func UnauthenticatedPrivateKey() []byte {
-	return []byte("withoutloginkey")
 }
