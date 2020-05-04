@@ -43,8 +43,10 @@ func App() *cobra.Command {
 		// Don't print usage on run errors.
 		SilenceUsage: true,
 	}
+	cmd.AddCommand(NewCheckCommand())
 
-	cmd.PersistentFlags().StringVar(&bindAddr, "bind", "127.0.0.1:9731", "http server bind address")
+	cmd.Flags().StringVar(&bindAddr, "bind", "127.0.0.1:9731", "http server bind address")
+
 	cmd.PersistentFlags().StringVar(&endpoint, "endpoint", "https://192.168.100.1/HNAP1/", "modem HNAP endpoint")
 	cmd.PersistentFlags().StringVar(&username, "username", "admin", "modem HNAP username")
 	cmd.PersistentFlags().StringVar(&password, "password", "motorola", "modem HNAP password")
@@ -55,7 +57,7 @@ func App() *cobra.Command {
 		endpointURL *url.URL
 	)
 
-	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		logrus.SetLevel(logrus.InfoLevel)
 		if logDebug {
 			logrus.SetLevel(logrus.DebugLevel)
@@ -67,13 +69,11 @@ func App() *cobra.Command {
 		}
 		endpointURL = parsedEndpoint
 
-		logrus.Debugf("Pulling HNAP metrics from %s", endpointURL.String())
-
 		return nil
 	}
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		// TODO: configure and run server
+		logrus.Debugf("Pulling HNAP metrics from %s", endpointURL.String())
 
 		gatherer, err := gather.New(endpointURL, username, password)
 		if err != nil {

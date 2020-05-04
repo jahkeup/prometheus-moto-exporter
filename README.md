@@ -4,6 +4,20 @@ This is a prometheus exporter written with the intention of exporting metrics fo
 
 My device, as configured by the CableTown ISP service, has SNMP disabled. With SNMP disabled, I wanted another route to be able to collect these metrics.
 
+## Build it
+
+The exporter can build with the common `go get`, `go build`, or `go install` usages.
+
+To explicitly pull and build from its GitHub repository:
+
+``` bash
+git clone https://github.com/jahkeup/prometheus-moto-exporter
+cd prometheus-moto-exporter
+go build ./cmd/prometheus-moto-exporter
+```
+
+Then either call the tool at its path or put it in your `$PATH`.
+
 ## Using it
 
 Given an address for the device, which by default is `192.168.100.1`, a fully constructed "endpoint" URL looks like `https://192.168.100.1/HNAP1/`.
@@ -32,7 +46,9 @@ Flags:
 
 ```
 
-## Example `/metrics`
+## See it - `/metrics`
+
+The metrics exported by the server will look a lot like this:
 
 ``` text
 # HELP moto_collection_seconds 
@@ -118,3 +134,16 @@ moto_upstream_channel_symbol_rate{channel="3",channel_id="3",modulation="SC-QAM"
 moto_upstream_channel_symbol_rate{channel="4",channel_id="4",modulation="SC-QAM"} 5.12e+06
 ```
 
+### What works
+
+I'm not 100% what devices will and won't work with this - you may find that it works with your model modem, or it may not.
+Contributions are welcome, however please bias towards cutting an issue to discuss changes before.
+
+#### Check
+
+Test if your modem has HNAP by running the `check` subcommand.
+The command will print out a single pass of metrics collected to perform the check.
+
+``` bash
+prometheus-moto-exporter check --endpoint "$myModem/HNAP1/"
+```
