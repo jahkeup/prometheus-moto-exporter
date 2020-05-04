@@ -103,9 +103,8 @@ func (s *Server) Collect() error {
 	// TODO: track requests separately
 	spanTimer := prometheus.NewTimer(s.meta.CollectionTime)
 	defer func() {
-		dur := spanTimer.ObserveDuration()
+		spanTimer.ObserveDuration()
 		logrus.WithFields(logrus.Fields{
-			"duration": dur,
 			"context":  "collect",
 		}).Info("finished collecting")
 	}()
@@ -230,6 +229,7 @@ func NewMetaMetrics() *metaMetrics {
 			Subsystem: "collection",
 			Name:      "seconds",
 			Buckets:   []float64{1, 5, 10, 15, 30, 45, 60},
+			Help: "time taken to perform collection from device in seconds",
 		}),
 	}
 }
