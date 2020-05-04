@@ -64,6 +64,8 @@ func (g *Gatherer) Login() error {
 		loginURI    = "http://purenetworks.com/HNAP1/Login"
 	)
 
+	log := logrus.WithField("action", "login")
+
 	// 1. Request challenge, uid, and public key from endpoint. We have to use a
 	// valid username to be given a login challenge.
 
@@ -84,13 +86,13 @@ func (g *Gatherer) Login() error {
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 
-	logrus.Debug("requesting login challenge")
+	log.Debug("requesting challenge")
 	resp, err := g.client.Do(req)
 	if err != nil {
 		logrus.WithError(err).Error("unable to request challenge")
 		return err
 	}
-	logrus.Debug("login  challenge accepted")
+	log.Debug("accepting challenge")
 
 	hnapResponse := struct {
 		LoginResponse struct {
@@ -105,10 +107,10 @@ func (g *Gatherer) Login() error {
 	if err != nil {
 		return err
 	}
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"challenge": hnapResponse.LoginResponse.Challenge,
 		"uid":       hnapResponse.LoginResponse.Cookie,
-	}).Debug("computing challenge response")
+	}).Trace("computing response")
 
 	// 2. Compute challenge response by making its "private key". We'll use it
 	// to submit a login challenge response to complete the login-flow.
@@ -155,21 +157,19 @@ func (g *Gatherer) Login() error {
 	req.AddCookie(uidCookie)
 	req.AddCookie(pkCookie)
 
-	logrus.WithField("request", req).Debugf("prepared request")
-
-	logrus.Debug("submitting challenge response")
+	log.Debug("submitting response")
 	resp, err = g.client.Do(req)
 	if err != nil {
-		logrus.WithError(err).Error("unable to complete accepted challenge")
+		log.WithError(err).Error("unable to login")
 		return err
 	}
 	resp.Body.Close()
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"action":      loginURI,
 		"action.call": "login",
 		"status":      resp.StatusCode,
-	}).Debug("challenge response sent")
+	}).Debug("response sent")
 
 	if resp.StatusCode != http.StatusOK {
 		return errors.New("challenge response rejected")
@@ -177,6 +177,7 @@ func (g *Gatherer) Login() error {
 
 	// Update client to use our new session
 
+	log.Trace("updating gatherer HTTP client")
 	// Acquire lock to modify the underlying client data.
 	g.mu.Lock()
 	{
@@ -185,6 +186,7 @@ func (g *Gatherer) Login() error {
 		g.client.Jar.SetCookies(g.endpoint, []*http.Cookie{uidCookie, pkCookie})
 	}
 	g.mu.Unlock()
+	log.Trace("gatherer configured with new login session")
 
 	return nil
 }
@@ -236,7 +238,8 @@ func (g *Gatherer) Gather() (*Collection, error) {
 	}
 
 	for k, v := range response.HNAP {
-		logrus.WithField("name", k).Debugf("%s", v)
+		// Raw JSON string
+		logrus.WithField("name", k).Trace("%s", v)
 	}
 
 	data, err = response.GetJSON(hnap.GetMotoStatusDownstreamChannelInfo)

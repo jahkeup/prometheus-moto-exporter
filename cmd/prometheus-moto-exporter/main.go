@@ -1,11 +1,13 @@
 package main
 
 import (
-	"os"
 	"net/url"
+	"os"
+	"os/signal"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/net/context"
 
 	"github.com/jahkeup/prometheus-moto-exporter/pkg/gather"
 )
@@ -78,17 +80,30 @@ func App() *cobra.Command {
 			return err
 		}
 
-		err = gatherer.Login()
+		server, err := NewServer(gatherer)
 		if err != nil {
+			logrus.WithError(err).Error("unable to setup server")
 			return err
 		}
 
-		coll, err := gatherer.Gather()
+		ctx, cancel := context.WithCancel(context.Background())
+
+		sigsent := make(chan os.Signal, 1)
+		signal.Notify(sigsent, os.Interrupt)
+
+		go func() {
+			<-sigsent
+			logrus.Info("SIGINT: shutting down server")
+			cancel()
+		}()
+
+		err = server.Run(ctx, bindAddr)
 		if err != nil {
+			logrus.WithError(err).Error("server error")
 			return err
 		}
 
-		logrus.Infof("%#v", coll)
+		logrus.Info("done")
 
 		return nil
 	}

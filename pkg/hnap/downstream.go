@@ -68,7 +68,6 @@ func (info *DownstreamInfo) Parse(row []string) error {
 	info.LockStatus = row[lockStatusField]
 	info.Modulation = row[modulationField]
 
-	logrus.WithField("row", row).WithField("info", info).Debugf("parsing channel ID from: %q", row[2])
 	info.ChannelID, err = strconv.ParseInt(getField(channelIDField), 10, 64)
 	if err != nil {
 		return errors.Wrap(err, "parse channel ID")

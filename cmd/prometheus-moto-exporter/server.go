@@ -1,39 +1,256 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/jahkeup/prometheus-moto-exporter/pkg/gather"
 	"github.com/jahkeup/prometheus-moto-exporter/pkg/hnap"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 const (
 	labelChannel    = "channel"
 	labelChannelID  = "channel_id"
 	labelModulation = "modulation"
+
+	namespace = "moto"
 )
+
+type serverRegistry interface {
+	prometheus.Gatherer
+	prometheus.Registerer
+}
 
 type Server struct {
 	gatherer *gather.Gatherer
 
-	upstream   upstreamMetrics
-	downstream downstreamMetrics
+	upstream   *upstreamMetrics
+	downstream *downstreamMetrics
 
-	registry prometheus.Registerer
+	meta *metaMetrics
+
+	registry serverRegistry
 }
 
+func NewServer(gatherer *gather.Gatherer) (*Server, error) {
+	s := &Server{
+		gatherer: gatherer,
+
+		upstream:   NewUpstreamMetrics(),
+		downstream: NewDownstreamMetrics(),
+		meta: NewMetaMetrics(),
+	}
+
+	// Add the metrics to the default registerer, user can change this later if
+	// they're using another.
+
+	// NOTE: this will cause the default registry to contain the metric even if
+	// the user does change it. The usage here doesn't bump into any issue with
+	// this.
+	reg, ok := prometheus.DefaultRegisterer.(serverRegistry)
+	if !ok {
+		return nil, errors.New("unable to use default registry")
+	}
+	err := s.RegisterMetrics(reg)
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
+// RegisterMetrics adds the Servers managed metrics to the provided registry and
+// updates itself to track this registry.
+func (s *Server) RegisterMetrics(reg serverRegistry) error {
+	s.registry = reg
+	err := s.upstream.RegisterMetrics(reg)
+	if err != nil {
+		return err
+	}
+	err = s.downstream.RegisterMetrics(reg)
+	if err != nil {
+
+	}
+	err = s.meta.RegisterMetrics(reg)
+	if err != nil {
+
+	}
+
+	return nil
+}
+
+func (s *Server) Collect() error {
+	// TODO: track requests separately
+	spanTimer := prometheus.NewTimer(s.meta.CollectionTime)
+	defer func() {
+		dur := spanTimer.ObserveDuration()
+		logrus.WithFields(logrus.Fields{
+			"duration": dur,
+			"context": "collect",
+		}).Info("finished collecting")
+	}()
+
+	err := s.gatherer.Login()
+	if err != nil {
+		return err
+	}
+	collect, err := s.gatherer.Gather()
+	if err != nil {
+		return err
+	}
+
+	for _, info := range collect.Downstream {
+		s.downstream.RecordOne(&info)
+	}
+
+	for _, info := range collect.Upstream {
+		s.upstream.RecordOne(&info)
+	}
+
+	return nil
+}
+
+func (s *Server) Run(ctx context.Context, addr string) error {
+	log := logrus.WithField("context", "server")
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.HandlerFor(s.registry, promhttp.HandlerOpts{
+		ErrorLog: log.WithField("handler", "prometheus"),
+		ErrorHandling: promhttp.ContinueOnError,
+	}))
+
+	srv := &http.Server{
+		Addr: addr,
+		Handler: mux,
+	}
+
+	log.Infof("starting server on %s", addr)
+
+	var serverErr error
+	go func() {
+		serverErr := srv.ListenAndServe()
+		if serverErr != nil && serverErr != http.ErrServerClosed {
+			log.WithError(serverErr).Error("server returned an error")
+		}
+	}()
+
+	collectCtx, cancel := context.WithCancel(ctx)
+	group, groupCtx := errgroup.WithContext(collectCtx)
+	group.Go(func() error {
+		log := log.WithField("context", "collect")
+		ticker := time.NewTicker(time.Second * 30)
+		defer ticker.Stop()
+
+		collect := func() {
+			// TODO: add retry handling
+			log.Info("collecting")
+			err := s.Collect()
+			if err != nil {
+				log.WithError(err).Error("collection error")
+				return
+			}
+			log.Info("completed successfully")
+		}
+
+		collect()
+
+		for {
+			select {
+			case <-ticker.C:
+				collect()
+			case <-collectCtx.Done():
+				return nil
+			}
+		}
+	})
+
+	go func() {
+		<-groupCtx.Done()
+		if groupCtx.Err() != nil && groupCtx.Err() != context.Canceled {
+			
+		}
+	}()
+
+	<-ctx.Done()
+	<-groupCtx.Done()
+
+	const shutdownTimeout = time.Second * 5
+	log.Info("shutting down server")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.WithError(err).Error("unable to shutdown server")
+		return err
+	}
+
+	log.Info("server shutdown")
+
+	if serverErr != nil && serverErr != http.ErrServerClosed {
+		return serverErr
+	}
+
+	return serverErr
+}
+
+// metaMetrics are internal metrics having to do with the server and collection
+// process, ie: not the collected data.
+type metaMetrics struct {
+	CollectionTime prometheus.Histogram
+}
+
+// NewMetaMetrics prepares a set of metrics for tracking internal server and
+// collection process metrics.
+func NewMetaMetrics() *metaMetrics {
+	return &metaMetrics{
+		CollectionTime: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "collection",
+			Name: "seconds",
+			Buckets: []float64{1, 5, 10, 15, 30, 45, 60},
+		}),
+	}
+}
+
+// RegisterMetrics adds metrics to the provided registry.
+func (m *metaMetrics) RegisterMetrics(reg prometheus.Registerer) error {
+	cs := []prometheus.Collector{
+		m.CollectionTime,
+	}
+
+	for _, c := range cs {
+		err := reg.Register(c)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+
+// downstreamMetrics are the metrics maintained for Downstream Channels.
 type downstreamMetrics struct {
 	// 0 or 1
-	Locked      *prometheus.GaugeVec
-	Frequency   *prometheus.GaugeVec
-	Uncorrected *prometheus.CounterVec
-	Corrected   *prometheus.CounterVec
+	Locked    *prometheus.GaugeVec
+	Frequency *prometheus.GaugeVec
+	// TODO: make these counters with Set(), the standard Counter does not allow
+	// this.
+	Uncorrected *prometheus.GaugeVec
+	Corrected   *prometheus.GaugeVec
 	Signal      *prometheus.GaugeVec
 	Power       *prometheus.GaugeVec
 }
 
 func NewDownstreamMetrics() *downstreamMetrics {
-	const namespace = "moto"
 	const subsystem = "downstream_channel"
 
 	var labels = []string{
@@ -47,42 +264,80 @@ func NewDownstreamMetrics() *downstreamMetrics {
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "locked",
+			Help:      "channel locked status",
 		}, labels),
 		Frequency: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "frequency",
+			Help:      "channel frequency in Hz",
 		}, labels),
-		Corrected: prometheus.NewCounterVec(prometheus.CounterOpts{
+		Corrected: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "corrected",
+			Name:      "corrected_total",
+			Help:      "corrected symbols",
 		}, labels),
-		Uncorrected: prometheus.NewCounterVec(prometheus.CounterOpts{
+		Uncorrected: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "uncorrected",
+			Name:      "uncorrected_total",
+			Help:      "uncorrected symbols",
 		}, labels),
 		Signal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "power_dbmv",
+			Name:      "signal_noise_ratio",
+			Help:      "signal to noise ratio measured in dB",
 		}, labels),
 		Power: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "power_dbmv",
+			Help:      "channel power level in dBmV",
 		}, labels),
 	}
 }
 
-func (m *downstreamMetrics) RecordOne(info *hnap.DownstreamInfo) {
-	// TODO: insert metrics from info
+func (m *downstreamMetrics) RegisterMetrics(reg prometheus.Registerer) error {
+	cs := []prometheus.Collector{
+		m.Locked,
+		m.Frequency,
+		m.Uncorrected,
+		m.Corrected,
+		m.Signal,
+		m.Power,
+	}
+
+	for _, c := range cs {
+		err := reg.Register(c)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (m *downstreamMetrics) RegisterMetrics(reg prometheus.Registerer) error {
-	// TODO: register all struct's metrics
-	return nil
+func (m *downstreamMetrics) RecordOne(info *hnap.DownstreamInfo) {
+	// TODO: insert metrics from info
+	labels := prometheus.Labels{
+		labelChannel:    fmt.Sprintf("%d", info.ID),
+		labelChannelID:  fmt.Sprintf("%d", info.ChannelID),
+		labelModulation: info.Modulation,
+	}
+
+	var locked float64
+	if info.LockStatus == "Locked" {
+		locked = 1
+	}
+
+	m.Locked.With(labels).Set(locked)
+	m.Frequency.With(labels).Set(info.Frequency)
+	m.Power.With(labels).Set(info.DecibelMillivolts)
+	m.Corrected.With(labels).Set(float64(info.Corrected))
+	m.Uncorrected.With(labels).Set(float64(info.Uncorrected))
+	m.Signal.With(labels).Set(info.Signal)
 }
 
 type upstreamMetrics struct {
@@ -93,8 +348,8 @@ type upstreamMetrics struct {
 	Power      *prometheus.GaugeVec
 }
 
+// upstreamMetrics are the metrics maintained for Downstream Channels.
 func NewUpstreamMetrics() *upstreamMetrics {
-	const namespace = "moto"
 	const subsystem = "upstream_channel"
 
 	labels := []string{
@@ -108,56 +363,61 @@ func NewUpstreamMetrics() *upstreamMetrics {
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "locked",
+			Help:      "channel locked status",
 		}, labels),
 		Frequency: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "frequency",
+			Help:      "channel freqency in Hz",
 		}, labels),
 		SymbolRate: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "symbol_rate",
+			Help:      "instantaneous symbols per second rate",
 		}, labels),
 		Power: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "power_dbmv",
+			Help:      "channel power level in dBmV",
 		}, labels),
 	}
 }
 
 func (m *upstreamMetrics) RegisterMetrics(reg prometheus.Registerer) error {
-	// TODO: register all struct's metrics
+	cs := []prometheus.Collector{
+		m.Locked,
+		m.Frequency,
+		m.SymbolRate,
+		m.Power,
+	}
+
+	for _, c := range cs {
+		err := reg.Register(c)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (m *upstreamMetrics) RecordOne(info *hnap.UpstreamInfo) {
-	// TODO: insert metrics from info
-}
-
-func (s *Server) Collect() error {
-	err := s.gatherer.Login()
-	if err != nil {
-		return err
-	}
-	collect, err := s.gatherer.Gather()
-	if err != nil {
-		return err
-	}
-	logrus.WithField("data", collect).Debug("collected metrics data")
-
-	for _, info := range collect.Downstream {
-		s.downstream.RecordOne(&info)
+	labels := prometheus.Labels{
+		labelChannel:    fmt.Sprintf("%d", info.ID),
+		labelChannelID:  fmt.Sprintf("%d", info.Channel),
+		labelModulation: info.Modulation,
 	}
 
-	for _, info := range collect.Upstream {
-		s.upstream.RecordOne(&info)
+	var locked float64
+	if info.LockStatus == "Locked" {
+		locked = 1
 	}
 
-	return nil
-}
-
-func (s *Server) registerMetric(m prometheus.Collector) error {
-	s.registry.Register(m)
+	m.Locked.With(labels).Set(locked)
+	m.Frequency.With(labels).Set(info.Frequency)
+	m.SymbolRate.With(labels).Set(float64(info.SymbolRate))
+	m.Power.With(labels).Set(info.DecibelMillivolts)
 }
