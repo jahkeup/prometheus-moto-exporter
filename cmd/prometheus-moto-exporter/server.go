@@ -17,9 +17,15 @@ import (
 )
 
 const (
-	labelChannel    = "channel"
-	labelChannelID  = "channel_id"
-	labelModulation = "modulation"
+	labelChannel         = "channel"
+	labelChannelID       = "channel_id"
+	labelModulation      = "modulation"
+	labelSerial          = "serial"
+	labelSoftwareVersion = "software_version"
+	labelHardwareVersion = "hardware_version"
+	labelCustomerVersion = "customer_version"
+	labelSpecVersion     = "spec_version"
+	labelBootFile        = "boot_file"
 
 	namespace = "moto"
 )
@@ -34,6 +40,7 @@ type Server struct {
 
 	upstream   *upstreamMetrics
 	downstream *downstreamMetrics
+	device     *deviceMetrics
 
 	meta *metaMetrics
 
@@ -46,7 +53,8 @@ func NewServer(gatherer *gather.Gatherer) (*Server, error) {
 
 		upstream:   NewUpstreamMetrics(),
 		downstream: NewDownstreamMetrics(),
-		meta: NewMetaMetrics(),
+		device:     NewDeviceMetrics(),
+		meta:       NewMetaMetrics(),
 	}
 
 	// Add the metrics to the default registerer, user can change this later if
@@ -71,17 +79,21 @@ func NewServer(gatherer *gather.Gatherer) (*Server, error) {
 // updates itself to track this registry.
 func (s *Server) RegisterMetrics(reg serverRegistry) error {
 	s.registry = reg
-	err := s.upstream.RegisterMetrics(reg)
-	if err != nil {
-		return err
-	}
-	err = s.downstream.RegisterMetrics(reg)
-	if err != nil {
 
+	groups := []interface{
+		RegisterMetrics(prometheus.Registerer) error
+	}{
+		s.upstream,
+		s.downstream,
+		s.device,
+		s.meta,
 	}
-	err = s.meta.RegisterMetrics(reg)
-	if err != nil {
 
+	for _, group := range groups {
+		err := group.RegisterMetrics(reg)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -94,7 +106,7 @@ func (s *Server) Collect() error {
 		dur := spanTimer.ObserveDuration()
 		logrus.WithFields(logrus.Fields{
 			"duration": dur,
-			"context": "collect",
+			"context":  "collect",
 		}).Info("finished collecting")
 	}()
 
@@ -115,6 +127,8 @@ func (s *Server) Collect() error {
 		s.upstream.RecordOne(&info)
 	}
 
+	s.device.RecordOne(collect)
+
 	return nil
 }
 
@@ -123,12 +137,12 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.HandlerFor(s.registry, promhttp.HandlerOpts{
-		ErrorLog: log.WithField("handler", "prometheus"),
+		ErrorLog:      log.WithField("handler", "prometheus"),
 		ErrorHandling: promhttp.ContinueOnError,
 	}))
 
 	srv := &http.Server{
-		Addr: addr,
+		Addr:    addr,
 		Handler: mux,
 	}
 
@@ -175,7 +189,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 	go func() {
 		<-groupCtx.Done()
 		if groupCtx.Err() != nil && groupCtx.Err() != context.Canceled {
-			
+
 		}
 	}()
 
@@ -184,7 +198,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 
 	const shutdownTimeout = time.Second * 5
 	log.Info("shutting down server")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
@@ -214,8 +228,8 @@ func NewMetaMetrics() *metaMetrics {
 		CollectionTime: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: "collection",
-			Name: "seconds",
-			Buckets: []float64{1, 5, 10, 15, 30, 45, 60},
+			Name:      "seconds",
+			Buckets:   []float64{1, 5, 10, 15, 30, 45, 60},
 		}),
 	}
 }
@@ -235,7 +249,6 @@ func (m *metaMetrics) RegisterMetrics(reg prometheus.Registerer) error {
 
 	return nil
 }
-
 
 // downstreamMetrics are the metrics maintained for Downstream Channels.
 type downstreamMetrics struct {
@@ -420,4 +433,73 @@ func (m *upstreamMetrics) RecordOne(info *hnap.UpstreamInfo) {
 	m.Frequency.With(labels).Set(info.Frequency)
 	m.SymbolRate.With(labels).Set(float64(info.SymbolRate))
 	m.Power.With(labels).Set(info.DecibelMillivolts)
+}
+
+type deviceMetrics struct {
+	Device    *prometheus.GaugeVec
+	Connected *prometheus.GaugeVec
+}
+
+// deviceMetrics are the metrics maintained for Downstream Channels.
+func NewDeviceMetrics() *deviceMetrics {
+	const subsystem = "device"
+
+	return &deviceMetrics{
+		Device: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "hardware_info",
+			Help:      "channel locked status",
+		}, []string{
+			labelSerial,
+			labelSoftwareVersion,
+			labelHardwareVersion,
+			labelCustomerVersion,
+			labelSpecVersion,
+			labelBootFile,
+		}),
+		Connected: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "connected_status",
+			Help:      "channel locked status",
+		}, []string{
+			labelSerial,
+		}),
+	}
+}
+
+func (m *deviceMetrics) RegisterMetrics(reg prometheus.Registerer) error {
+	cs := []prometheus.Collector{
+		m.Device,
+		m.Connected,
+	}
+
+	for _, c := range cs {
+		err := reg.Register(c)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *deviceMetrics) RecordOne(info *gather.Collection) {
+	m.Device.With(prometheus.Labels{
+		labelSerial: info.SerialNumber,
+		labelSoftwareVersion: info.SoftwareVersion,
+		labelHardwareVersion: info.HardwareVersion,
+		labelCustomerVersion: info.CustomerVersion,
+		labelSpecVersion: info.SpecVersion,
+		labelBootFile: info.BootFile,
+	}).Set(1)
+
+	var connected float64
+	if info.Online {
+		connected = 1
+	}
+	m.Connected.With(prometheus.Labels{
+		labelSerial: info.SerialNumber,
+	}).Set(connected)
 }

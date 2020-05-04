@@ -242,23 +242,47 @@ func (g *Gatherer) Gather() (*Collection, error) {
 		logrus.WithField("name", k).Trace("%s", v)
 	}
 
-	data, err = response.GetJSON(hnap.GetMotoStatusDownstreamChannelInfo)
-	var downstream hnap.DownstreamChannelResponse
-	err = json.Unmarshal(data, &downstream)
-	if err != nil {
-		return nil, err
+	var (
+		upstream       hnap.UpstreamChannelResponse
+		downstream     hnap.DownstreamChannelResponse
+		connection     hnap.HomeConnectionResponse
+		startup        hnap.MotoStatusStartupSequenceResponse
+		homeAddress    hnap.HomeAddressResponse
+		software       hnap.MotoStatusSoftwareResponse
+		connectionInfo hnap.MotoStatusConnectionInfoResponse
+	)
+
+	parses := map[string]interface{}{
+		hnap.GetMotoStatusDownstreamChannelInfo: &downstream,
+		hnap.GetMotoStatusUpstreamChannelInfo:   &upstream,
+		hnap.GetHomeAddress:                     &homeAddress,
+		hnap.GetMotoStatusSoftware:              &software,
+		hnap.GetMotoStatusConnectionInfo:        &connectionInfo,
+		hnap.GetHomeConnection:                  &connection,
+		hnap.GetMotoStatusStartupSequence:       &startup,
 	}
 
-	data, err = response.GetJSON(hnap.GetMotoStatusUpstreamChannelInfo)
-	var upstream hnap.UpstreamChannelResponse
-	err = json.Unmarshal(data, &upstream)
-	if err != nil {
-		return nil, err
+	for name, binding := range parses {
+		data, err := response.GetJSON(name)
+		err = json.Unmarshal(data, binding)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Collection{
-		Upstream: upstream.Channels,
+		Upstream:   upstream.Channels,
 		Downstream: downstream.Channels,
+
+		Online: connection.Online == hnap.Connected,
+
+		SoftwareVersion: software.SoftwareVersion,
+		SpecVersion:     software.SpecVersion,
+		HardwareVersion: software.HardwareVersion,
+		SerialNumber:    software.SerialNumber,
+
+		CustomerVersion: software.CustomerVersion,
+		BootFile:        startup.ConfigurationFileName,
 	}, nil
 }
 
