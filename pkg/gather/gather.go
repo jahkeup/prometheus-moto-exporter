@@ -329,7 +329,7 @@ func digestAuth(actionURI string, key []byte) ([]byte, int64, error) {
 // digest prepares an authentication digest for use with HNAP.
 func digest(msg string, key []byte) ([]byte, error) {
 	mac := hmac.New(md5.New, key)
-	_, err := fmt.Fprintf(mac, msg)
+	_, err := fmt.Fprint(mac, msg)
 	if err != nil {
 		return nil, err
 	}
