@@ -239,7 +239,7 @@ func (g *Gatherer) Gather() (*Collection, error) {
 
 	for k, v := range response.HNAP {
 		// Raw JSON string
-		logrus.WithField("name", k).Trace("%s", v)
+		logrus.WithField("name", k).Tracef("%s", v)
 	}
 
 	var (
