@@ -264,9 +264,12 @@ func (g *Gatherer) Gather() (*Collection, error) {
 
 	for name, binding := range parses {
 		data, err := response.GetJSON(name)
+		if err != nil {
+			return nil, fmt.Errorf("cannot fetch data: %w", err)
+		}
 		err = json.Unmarshal(data, binding)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot parse data: %w", err)
 		}
 	}
 
