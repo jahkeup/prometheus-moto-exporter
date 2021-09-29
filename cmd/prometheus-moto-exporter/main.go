@@ -63,6 +63,16 @@ func App() *cobra.Command {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 
+		if endpoint == "" {
+			endpoint = os.Getenv(envEndpoint)
+		}
+		if username == "" {
+			username = os.Getenv(envUsername)
+		}
+		if password == "" {
+			password = os.Getenv(envPassword)
+		}
+
 		parsedEndpoint, err := url.Parse(endpoint)
 		if err != nil {
 			return err

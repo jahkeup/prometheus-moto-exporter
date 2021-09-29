@@ -25,10 +25,11 @@ type GetMultipleHNAPsResponse struct {
 
 func (g *GetMultipleHNAPsResponse) GetJSON(name string) (json.RawMessage, error) {
 	data, ok := g.HNAP[name]
-	if !ok {
-		name += "Response"
+	if ok {
+		return data, nil
 	}
-	data, ok = g.HNAP[name]
+	// Might be namespaced under the request, check there too.
+	data, ok = g.HNAP[name+"Response"]
 	if !ok {
 		return nil, errors.New("no response found ")
 	}

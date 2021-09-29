@@ -82,6 +82,9 @@ func (g *Gatherer) Login() error {
 	}
 
 	req, err := http.NewRequest(http.MethodPost, g.endpoint.String(), bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
 	req.Header.Add(hSOAPAction, loginURI)
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
@@ -239,7 +242,7 @@ func (g *Gatherer) Gather() (*Collection, error) {
 
 	for k, v := range response.HNAP {
 		// Raw JSON string
-		logrus.WithField("name", k).Trace("%s", v)
+		logrus.WithField("name", k).Tracef("%s", v)
 	}
 
 	var (
@@ -264,9 +267,12 @@ func (g *Gatherer) Gather() (*Collection, error) {
 
 	for name, binding := range parses {
 		data, err := response.GetJSON(name)
+		if err != nil {
+			return nil, fmt.Errorf("cannot fetch data: %w", err)
+		}
 		err = json.Unmarshal(data, binding)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot parse data: %w", err)
 		}
 	}
 
@@ -326,7 +332,7 @@ func digestAuth(actionURI string, key []byte) ([]byte, int64, error) {
 // digest prepares an authentication digest for use with HNAP.
 func digest(msg string, key []byte) ([]byte, error) {
 	mac := hmac.New(md5.New, key)
-	_, err := fmt.Fprintf(mac, msg)
+	_, err := fmt.Fprint(mac, msg)
 	if err != nil {
 		return nil, err
 	}
