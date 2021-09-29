@@ -82,6 +82,9 @@ func (g *Gatherer) Login() error {
 	}
 
 	req, err := http.NewRequest(http.MethodPost, g.endpoint.String(), bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
 	req.Header.Add(hSOAPAction, loginURI)
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
