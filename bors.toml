@@ -1,4 +1,4 @@
 status = [
-  "build",
-  "lint",
+  "Build",
+  "Lint",
 ]
