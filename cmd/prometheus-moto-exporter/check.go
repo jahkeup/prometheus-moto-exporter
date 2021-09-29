@@ -1,11 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"net/url"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/prometheus/common/expfmt"
 
@@ -57,10 +57,13 @@ func NewCheckCommand() *cobra.Command {
 		}
 
 		reg := prometheus.NewRegistry()
-		srv.RegisterMetrics(reg)
+		err = srv.RegisterMetrics(reg)
+		if err != nil {
+			return fmt.Errorf("failed to register exporter metrics: %w", err)
+		}
 		err = srv.Collect()
 		if err != nil {
-			return errors.Wrap(err, "unable to get metrics from endpoint")
+			return fmt.Errorf("unable to get metrics from endpoint: %w", err)
 		}
 
 		// Gather metrics and dump to console.
