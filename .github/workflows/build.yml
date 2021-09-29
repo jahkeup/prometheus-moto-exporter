@@ -8,9 +8,8 @@ on:
   push:
     branches:
       - 'main'
-    paths:
-      - 'go.*'
-      - '**.go'
+      - 'staging'
+      - 'trying'
 
 jobs:
   build:
