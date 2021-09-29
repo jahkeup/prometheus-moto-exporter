@@ -3,7 +3,7 @@ module github.com/jahkeup/prometheus-moto-exporter
 go 1.14
 
 require (
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v0.9.4
 	github.com/prometheus/common v0.4.1
 	github.com/sirupsen/logrus v1.8.1
