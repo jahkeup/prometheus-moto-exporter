@@ -156,6 +156,8 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 	}()
 
 	collectCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	group, groupCtx := errgroup.WithContext(collectCtx)
 	group.Go(func() error {
 		log := log.WithField("context", "collect")
@@ -197,7 +199,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 
 	const shutdownTimeout = time.Second * 5
 	log.Info("shutting down server")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
