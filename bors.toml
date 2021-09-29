@@ -2,3 +2,5 @@ status = [
   "Build",
   "Lint",
 ]
+
+delete_merged_branches = true
