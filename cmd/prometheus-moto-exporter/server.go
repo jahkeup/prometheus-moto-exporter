@@ -189,9 +189,6 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 
 	go func() {
 		<-groupCtx.Done()
-		if groupCtx.Err() != nil && groupCtx.Err() != context.Canceled {
-
-		}
 	}()
 
 	<-ctx.Done()
