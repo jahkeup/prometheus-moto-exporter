@@ -10,8 +10,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # Download and verify dependencies.
-RUN go mod download
-RUN go mod verify
+RUN go mod download && go mod verify
 
 # Copy the source from the current directory to the Working Directory inside the container
 COPY . .
