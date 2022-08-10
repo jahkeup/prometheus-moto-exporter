@@ -36,7 +36,7 @@ func App() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use: "prometheus-moto-exporter",
+		Use:   "prometheus-moto-exporter",
 		Short: "Exporter for Motorola modems equipped with HNAP",
 		// TODO: move to a build-time var
 		Version: "0.1.0",

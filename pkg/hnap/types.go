@@ -1,9 +1,9 @@
 package hnap
 
 import (
+	"net"
 	"strconv"
-"net"
-"strings"
+	"strings"
 )
 
 const (
@@ -76,6 +76,6 @@ type MotoStatusSoftwareResponse struct {
 }
 
 type MotoStatusConnectionInfoResponse struct {
-	Uptime string `json:"MotoConnSystemUpTime"`
+	Uptime        string `json:"MotoConnSystemUpTime"`
 	NetworkAccess string `json:"MotoConnNetworkAccess"`
 }

@@ -80,7 +80,7 @@ func NewServer(gatherer *gather.Gatherer) (*Server, error) {
 func (s *Server) RegisterMetrics(reg serverRegistry) error {
 	s.registry = reg
 
-	groups := []interface{
+	groups := []interface {
 		RegisterMetrics(prometheus.Registerer) error
 	}{
 		s.upstream,
@@ -105,7 +105,7 @@ func (s *Server) Collect() error {
 	defer func() {
 		spanTimer.ObserveDuration()
 		logrus.WithFields(logrus.Fields{
-			"context":  "collect",
+			"context": "collect",
 		}).Info("finished collecting")
 	}()
 
@@ -228,7 +228,7 @@ func NewMetaMetrics() *metaMetrics {
 			Subsystem: "collection",
 			Name:      "seconds",
 			Buckets:   []float64{1, 5, 10, 15, 30, 45, 60},
-			Help: "time taken to perform collection from device in seconds",
+			Help:      "time taken to perform collection from device in seconds",
 		}),
 	}
 }
@@ -486,12 +486,12 @@ func (m *deviceMetrics) RegisterMetrics(reg prometheus.Registerer) error {
 
 func (m *deviceMetrics) RecordOne(info *gather.Collection) {
 	m.Device.With(prometheus.Labels{
-		labelSerial: info.SerialNumber,
+		labelSerial:          info.SerialNumber,
 		labelSoftwareVersion: info.SoftwareVersion,
 		labelHardwareVersion: info.HardwareVersion,
 		labelCustomerVersion: info.CustomerVersion,
-		labelSpecVersion: info.SpecVersion,
-		labelBootFile: info.BootFile,
+		labelSpecVersion:     info.SpecVersion,
+		labelBootFile:        info.BootFile,
 	}).Set(1)
 
 	var connected float64

@@ -5,17 +5,16 @@ const (
 
 	GetMultipleHNAPs = "GetMultipleHNAPs"
 
-	GetHomeAddress = "GetHomeAddress"
+	GetHomeAddress    = "GetHomeAddress"
 	GetHomeConnection = "GetHomeConnection"
 
-
-	GetMotoLagStatus = "GetMotoLagStatus"
-	GetMotoStatusConnectionInfo = "GetMotoStatusConnectionInfo"
+	GetMotoLagStatus                   = "GetMotoLagStatus"
+	GetMotoStatusConnectionInfo        = "GetMotoStatusConnectionInfo"
 	GetMotoStatusDownstreamChannelInfo = "GetMotoStatusDownstreamChannelInfo"
-	GetMotoStatusLog = "GetMotoStatusLog"
-	GetMotoStatusSoftware = "GetMotoStatusSoftware"
-	GetMotoStatusStartupSequence = "GetMotoStatusStartupSequence"
-	GetMotoStatusUpstreamChannelInfo = "GetMotoStatusUpstreamChannelInfo"
+	GetMotoStatusLog                   = "GetMotoStatusLog"
+	GetMotoStatusSoftware              = "GetMotoStatusSoftware"
+	GetMotoStatusStartupSequence       = "GetMotoStatusStartupSequence"
+	GetMotoStatusUpstreamChannelInfo   = "GetMotoStatusUpstreamChannelInfo"
 )
 
 // {

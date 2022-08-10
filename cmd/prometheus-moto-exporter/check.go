@@ -2,20 +2,20 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"net/url"
+	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cobra"
 	"github.com/prometheus/common/expfmt"
+	"github.com/spf13/cobra"
 
 	"github.com/jahkeup/prometheus-moto-exporter/pkg/gather"
 )
 
 func NewCheckCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "check",
-		Short: "Run a check run against the configured endpoint",
+		Use:          "check",
+		Short:        "Run a check run against the configured endpoint",
 		SilenceUsage: true,
 	}
 

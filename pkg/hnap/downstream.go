@@ -2,8 +2,8 @@ package hnap
 
 import (
 	"encoding/json"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -25,15 +25,15 @@ import (
 // DSChannelHtml += "<td class='moto-param-header-s'>Uncorrected</td></tr>";
 
 type DownstreamInfo struct {
-	ID int64
-	LockStatus string
-	Modulation string
-	ChannelID int64
-	Frequency float64
+	ID                int64
+	LockStatus        string
+	Modulation        string
+	ChannelID         int64
+	Frequency         float64
 	DecibelMillivolts float64
-	Signal float64
-	Corrected int64
-	Uncorrected int64
+	Signal            float64
+	Corrected         int64
+	Uncorrected       int64
 }
 
 func (info *DownstreamInfo) Parse(row []string) error {
@@ -48,7 +48,6 @@ func (info *DownstreamInfo) Parse(row []string) error {
 		signalField
 		correctedField
 		uncorrectedField
-
 	)
 	if len(row) != infoRowSize {
 		return errors.New("invalid data size")
