@@ -16,7 +16,7 @@ RUN go mod download && go mod verify
 COPY . .
 
 # Build the app
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" ./cmd/prometheus-moto-exporter
+RUN go build -ldflags="-w -s" ./cmd/prometheus-moto-exporter
 
 # Build a small image
 FROM alpine
