@@ -31,4 +31,4 @@ ENV MOTO_PASSWORD=motorola
 EXPOSE 9731
 
 # Run the executable
-ENTRYPOINT /go/bin/prometheus-moto-exporter --bind 0.0.0.0:9731 --username ${MOTO_USERNAME} --password ${MOTO_PASSWORD}
+ENTRYPOINT ["/go/bin/prometheus-moto-exporter", "--bind", "0.0.0.0:9731"]
