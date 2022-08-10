@@ -83,7 +83,10 @@ func App() *cobra.Command {
 	}
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		logrus.Debugf("Pulling HNAP metrics from %s", endpointURL.String())
+		logrus.WithFields(logrus.Fields{
+			"endpoint": endpointURL,
+			"username": username,
+		}).Debugf("configured for HNAP metrics")
 
 		gatherer, err := gather.New(endpointURL, username, password)
 		if err != nil {
