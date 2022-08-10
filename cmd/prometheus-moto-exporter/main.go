@@ -63,13 +63,13 @@ func App() *cobra.Command {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 
-		if endpoint == "" {
+		if v := os.Getenv(envEndpoint); v != "" && !cmd.Flag("endpoint").Changed {
 			endpoint = os.Getenv(envEndpoint)
 		}
-		if username == "" {
+		if v := os.Getenv(envUsername); v != "" && !cmd.Flag("username").Changed {
 			username = os.Getenv(envUsername)
 		}
-		if password == "" {
+		if v := os.Getenv(envPassword); v != "" && !cmd.Flag("password").Changed {
 			password = os.Getenv(envPassword)
 		}
 
