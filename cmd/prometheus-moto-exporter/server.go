@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -435,7 +436,10 @@ func (m *upstreamMetrics) RecordOne(info *hnap.UpstreamInfo) {
 }
 
 type deviceMetrics struct {
-	Device    *prometheus.GaugeVec
+	Device       *prometheus.GaugeVec
+	mu           *sync.RWMutex
+	deviceLabels prometheus.Labels
+
 	Connected *prometheus.GaugeVec
 }
 
@@ -457,6 +461,7 @@ func NewDeviceMetrics() *deviceMetrics {
 			labelSpecVersion,
 			labelBootFile,
 		}),
+		mu: &sync.RWMutex{},
 		Connected: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
@@ -484,15 +489,46 @@ func (m *deviceMetrics) RegisterMetrics(reg prometheus.Registerer) error {
 	return nil
 }
 
-func (m *deviceMetrics) RecordOne(info *gather.Collection) {
-	m.Device.With(prometheus.Labels{
+func (m *deviceMetrics) deviceInfoLabels(info *gather.Collection) prometheus.Labels {
+	m.mu.RLock()
+	n := len(m.deviceLabels)
+	m.mu.RUnlock()
+
+	if n != 0 {
+		return m.deviceLabels
+	}
+
+	labels := prometheus.Labels{
 		labelSerial:          info.SerialNumber,
 		labelSoftwareVersion: info.SoftwareVersion,
 		labelHardwareVersion: info.HardwareVersion,
 		labelCustomerVersion: info.CustomerVersion,
 		labelSpecVersion:     info.SpecVersion,
 		labelBootFile:        info.BootFile,
-	}).Set(1)
+	}
+	for k, v := range labels {
+		if v == "" {
+			logrus.WithField("data", labels).Infof("incomplete device data: missing %q", k)
+			labels = nil
+			break
+		}
+	}
+
+	if len(labels) != 0 {
+		m.mu.Lock()
+		if len(m.deviceLabels) == 0 {
+			m.deviceLabels = labels
+		}
+		m.mu.Unlock()
+	}
+
+	return m.deviceLabels
+}
+
+func (m *deviceMetrics) RecordOne(info *gather.Collection) {
+	if l := m.deviceInfoLabels(info); len(l) != 0 {
+		m.Device.With(l).Set(1)
+	}
 
 	var connected float64
 	if info.Online {
