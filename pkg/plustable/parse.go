@@ -19,7 +19,12 @@ func Parse(str string) [][]string {
 	parsed := make([][]string, len(rows))
 
 	for i, row := range rows {
-		parsed[i] = strings.Split(row, colSep)
+		cells := strings.Split(row, colSep)
+
+		parsed[i] = make([]string, len(cells))
+		for idx, cell := range cells {
+			parsed[i][idx] = strings.TrimSpace(cell)
+		}
 	}
 
 	return parsed
