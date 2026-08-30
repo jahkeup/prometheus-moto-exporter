@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ func App() *cobra.Command {
 		endpoint string
 		username string
 		password string
+		interval time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -46,6 +48,11 @@ func App() *cobra.Command {
 	cmd.AddCommand(NewCheckCommand())
 
 	cmd.Flags().StringVar(&bindAddr, "bind", "127.0.0.1:9731", "http server bind address")
+	// NOTE: every tick performs a fresh HNAP login against the modem. Some
+	// devices (eg: MB8600/MB8611) have been observed locking out logins after
+	// too many attempts in a short window - keep this conservative (tens of
+	// minutes) rather than the historical hardcoded 30s default.
+	cmd.Flags().DurationVar(&interval, "interval", time.Second*30, "how often to login and collect metrics from the modem")
 
 	cmd.PersistentFlags().StringVar(&endpoint, "endpoint", "https://192.168.100.1/HNAP1/", "modem HNAP endpoint")
 	cmd.PersistentFlags().StringVar(&username, "username", "admin", "modem HNAP username")
@@ -110,7 +117,7 @@ func App() *cobra.Command {
 			cancel()
 		}()
 
-		err = server.Run(ctx, bindAddr)
+		err = server.Run(ctx, bindAddr, interval)
 		if err != nil {
 			logrus.WithError(err).Error("server error")
 			return err
