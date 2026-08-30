@@ -131,7 +131,7 @@ func (s *Server) Collect() error {
 	return nil
 }
 
-func (s *Server) Run(ctx context.Context, addr string) error {
+func (s *Server) Run(ctx context.Context, addr string, interval time.Duration) error {
 	log := logrus.WithField("context", "server")
 
 	mux := http.NewServeMux()
@@ -161,7 +161,7 @@ func (s *Server) Run(ctx context.Context, addr string) error {
 	group, groupCtx := errgroup.WithContext(collectCtx)
 	group.Go(func() error {
 		log := log.WithField("context", "collect")
-		ticker := time.NewTicker(time.Second * 30)
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
 		collect := func() {

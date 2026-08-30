@@ -52,6 +52,16 @@ func New(endpoint *url.URL, username, password string) (*Gatherer, error) {
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
 				},
+				// The MB8600/MB8611 embedded HTTP server does not reliably
+				// support keep-alive across requests: reusing a pooled
+				// connection for a second request returns EOF, which the
+				// modem's login flow then reports as an invalid login
+				// attempt (see jahkeup/prometheus-moto-exporter#32). Forcing
+				// a fresh TCP connection per request avoids reusing a
+				// connection the modem has already closed on its end, and
+				// gets us the same effect as restarting the process between
+				// requests without actually doing that.
+				DisableKeepAlives: true,
 			},
 			Timeout: time.Second * 45,
 		},
@@ -65,6 +75,24 @@ func (g *Gatherer) Login() error {
 	)
 
 	log := logrus.WithField("action", "login")
+
+	// Reset session state before requesting a new challenge. A long-running
+	// process reuses this Gatherer (and its cookie jar) across many Login()
+	// calls; if a prior login's uid/PrivateKey cookies are still attached
+	// when we ask for a new challenge, the modem appears to choke on the
+	// request and closes the connection (surfaces as an EOF), which then
+	// gets treated as a failed login. A brand new process never has this
+	// problem since it only ever performs one Login() with an empty jar -
+	// so we replicate that "always empty jar" starting condition on every
+	// Login() call, not just process startup.
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return err
+	}
+	g.mu.Lock()
+	g.client.Jar = jar
+	g.privateKey = nil
+	g.mu.Unlock()
 
 	// 1. Request challenge, uid, and public key from endpoint. We have to use a
 	// valid username to be given a login challenge.
