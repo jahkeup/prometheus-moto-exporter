@@ -1,0 +1,104 @@
+# Auto-generated from a real /metrics dump - see gen_ha_sensors.py.
+# Regenerate this file (rerun the script against a fresh dump) if your
+# provider ever changes channel bonding/count; entity unique_ids are
+# stable across regenerations as long as channel numbers don't change.
+#
+# This file is the *value* of a `rest:` key, not a `rest:` key itself -
+# include it in configuration.yaml as:  rest: !include moto_ha_sensors.yaml
+- resource: "http://<exporter-host>:9731/metrics"
+  scan_interval: 300
+  sensor:
+    - name: "Modem Connected"
+      unique_id: "moto_device_connected_status_0000-MB8600-00-0000"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_device_connected_status\\{serial=\"0000\\-MB8600\\-00\\-0000\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+    - name: "Modem Downstream CH1 (ID 20, QAM256) Corrected"
+      unique_id: "moto_downstream_ch1_corrected_total"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_corrected_total\\{channel=\"1\",channel_id=\"20\",modulation=\"QAM256\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "codewords"
+      state_class: total_increasing
+    - name: "Modem Downstream CH33 (ID 193, OFDM PLC) Corrected"
+      unique_id: "moto_downstream_ch33_corrected_total"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_corrected_total\\{channel=\"33\",channel_id=\"193\",modulation=\"OFDM\\ PLC\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "codewords"
+      state_class: total_increasing
+    - name: "Modem Downstream CH1 (ID 20, QAM256) Frequency"
+      unique_id: "moto_downstream_ch1_frequency"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_frequency\\{channel=\"1\",channel_id=\"20\",modulation=\"QAM256\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "Hz"
+      state_class: measurement
+    - name: "Modem Downstream CH33 (ID 193, OFDM PLC) Frequency"
+      unique_id: "moto_downstream_ch33_frequency"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_frequency\\{channel=\"33\",channel_id=\"193\",modulation=\"OFDM\\ PLC\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "Hz"
+      state_class: measurement
+    - name: "Modem Downstream CH1 (ID 20, QAM256) Locked"
+      unique_id: "moto_downstream_ch1_locked"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_locked\\{channel=\"1\",channel_id=\"20\",modulation=\"QAM256\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+    - name: "Modem Downstream CH33 (ID 193, OFDM PLC) Locked"
+      unique_id: "moto_downstream_ch33_locked"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_locked\\{channel=\"33\",channel_id=\"193\",modulation=\"OFDM\\ PLC\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+    - name: "Modem Downstream CH1 (ID 20, QAM256) Power"
+      unique_id: "moto_downstream_ch1_power_dbmv"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_power_dbmv\\{channel=\"1\",channel_id=\"20\",modulation=\"QAM256\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "dBmV"
+      state_class: measurement
+    - name: "Modem Downstream CH33 (ID 193, OFDM PLC) Power"
+      unique_id: "moto_downstream_ch33_power_dbmv"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_power_dbmv\\{channel=\"33\",channel_id=\"193\",modulation=\"OFDM\\ PLC\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "dBmV"
+      state_class: measurement
+    - name: "Modem Downstream CH1 (ID 20, QAM256) SNR"
+      unique_id: "moto_downstream_ch1_signal_noise_ratio"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_signal_noise_ratio\\{channel=\"1\",channel_id=\"20\",modulation=\"QAM256\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "dB"
+      state_class: measurement
+    - name: "Modem Downstream CH33 (ID 193, OFDM PLC) SNR"
+      unique_id: "moto_downstream_ch33_signal_noise_ratio"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_signal_noise_ratio\\{channel=\"33\",channel_id=\"193\",modulation=\"OFDM\\ PLC\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "dB"
+      state_class: measurement
+    - name: "Modem Downstream CH1 (ID 20, QAM256) Uncorrected"
+      unique_id: "moto_downstream_ch1_uncorrected_total"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_uncorrected_total\\{channel=\"1\",channel_id=\"20\",modulation=\"QAM256\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "codewords"
+      state_class: total_increasing
+    - name: "Modem Downstream CH33 (ID 193, OFDM PLC) Uncorrected"
+      unique_id: "moto_downstream_ch33_uncorrected_total"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_downstream_channel_uncorrected_total\\{channel=\"33\",channel_id=\"193\",modulation=\"OFDM\\ PLC\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "codewords"
+      state_class: total_increasing
+    - name: "Modem Upstream CH1 (ID 1, SC-QAM) Frequency"
+      unique_id: "moto_upstream_ch1_frequency"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_upstream_channel_frequency\\{channel=\"1\",channel_id=\"1\",modulation=\"SC\\-QAM\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "Hz"
+      state_class: measurement
+    - name: "Modem Upstream CH1 (ID 1, SC-QAM) Locked"
+      unique_id: "moto_upstream_ch1_locked"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_upstream_channel_locked\\{channel=\"1\",channel_id=\"1\",modulation=\"SC\\-QAM\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+    - name: "Modem Upstream CH1 (ID 1, SC-QAM) Power"
+      unique_id: "moto_upstream_ch1_power_dbmv"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_upstream_channel_power_dbmv\\{channel=\"1\",channel_id=\"1\",modulation=\"SC\\-QAM\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "dBmV"
+      state_class: measurement
+    - name: "Modem Upstream CH1 (ID 1, SC-QAM) Symbol Rate"
+      unique_id: "moto_upstream_ch1_symbol_rate"
+      value_template: >-
+        {{ value | regex_findall_index(find="moto_upstream_channel_symbol_rate\\{channel=\"1\",channel_id=\"1\",modulation=\"SC\\-QAM\"\\}\\s+([\\-0-9\\.eE\\+]+)") }}
+      unit_of_measurement: "sym/s"
+      state_class: measurement

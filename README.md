@@ -147,3 +147,8 @@ The command will print out a single pass of metrics collected to perform the che
 ``` bash
 prometheus-moto-exporter check --endpoint "$myModem/HNAP1/"
 ```
+
+## Deployment guides
+
+- [QNAP-README.md](QNAP-README.md) - building and running under QNAP Container Station, including cross-building for `linux/amd64` and importing the image without a registry.
+- [HA-README.md](HA-README.md) - consuming `/metrics` from Home Assistant via the `rest:` sensor platform, including a generator script for producing a full per-channel sensor set.
